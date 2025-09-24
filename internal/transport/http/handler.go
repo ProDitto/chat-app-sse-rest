@@ -9,34 +9,44 @@ import (
 )
 
 type Handler struct {
-	userUsecase usecase.UserUsecase
+	userUsecase  usecase.UserUsecase
+	eventUsecase usecase.EventUsecase
 }
 
-func NewHandler(userUsecase usecase.UserUsecase) *Handler {
+func NewHandler(userUsecase usecase.UserUsecase, eventUsecase usecase.EventUsecase) *Handler {
 	return &Handler{
-		userUsecase: userUsecase,
+		userUsecase:  userUsecase,
+		eventUsecase: eventUsecase,
 	}
 }
 
 func (h *Handler) InitRoutes() *chi.Mux {
-	r := chi.NewRouter()
+	router := chi.NewRouter()
 
-	r.Use(middleware.Logger)
-	r.Use(middleware.Recoverer)
-	r.Use(middleware.RequestID)
-	r.Use(middleware.RealIP)
-	r.Use(middleware.Heartbeat("/ping"))
+	router.Use(middleware.RequestID)
+	router.Use(middleware.RealIP)
+	router.Use(middleware.Logger)
+	router.Use(middleware.Recoverer)
+	router.Use(middleware.Heartbeat("/ping")) // Keep original heartbeat
 
-	r.Route("/api", func(r chi.Router) {
-		userHandler := NewUserHandler(h.userUsecase)
+	router.Get("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	userHandler := NewUserHandler(h.userUsecase)
+	eventHandler := NewEventHandler(h.eventUsecase)
+
+	router.Route("/api", func(r chi.Router) {
 		r.Post("/join", userHandler.Join)
 		r.Post("/change-username", userHandler.ChangeUsername)
+		r.Post("/message", eventHandler.SendMessage)
+		r.Post("/typing", eventHandler.SendTypingStatus)
 	})
 
 	// Serve static files
 	fs := http.FileServer(http.Dir("./public"))
-	r.Handle("/*", fs)
+	router.Handle("/*", fs)
 
-	return r
+	return router
 }
 
