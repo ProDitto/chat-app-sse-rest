@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"fmt"
-	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -22,15 +21,16 @@ func main() {
 	// Load configuration
 	cfg, err := config.LoadConfig("configs/config.yaml")
 	if err != nil {
-		log.Fatalf("Failed to load config: %v", err)
+		slog.Error("failed to load config", "error", err)
+		os.Exit(1)
 	}
 
 	// Override with environment variables if they exist
-	if redisAddr := os.Getenv("REDIS_ADDR"); redisAddr != "" {
-		cfg.Redis.Addr = redisAddr
-	}
 	if serverPort := os.Getenv("SERVER_PORT"); serverPort != "" {
 		cfg.Server.Port = serverPort
+	}
+	if redisAddr := os.Getenv("REDIS_ADDR"); redisAddr != "" {
+		cfg.Redis.Addr = redisAddr
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())
@@ -44,10 +44,11 @@ func main() {
 	})
 	defer redisClient.Close()
 
-	if _, err := redisClient.Ping(ctx).Result(); err != nil {
-		log.Fatalf("Could not connect to Redis: %v", err)
+	if _, err := redisClient.Ping(context.Background()).Result(); err != nil {
+		slog.Error("could not connect to Redis", "error", err)
+		os.Exit(1)
 	}
-	log.Println("Successfully connected to Redis")
+	slog.Info("successfully connected to Redis")
 
 	// Initialize repositories
 	userRepo := repository.NewRedisUserRepository(redisClient)
@@ -64,24 +65,24 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
-				log.Println("Running inactive user cleanup...")
+				slog.Info("running inactive user cleanup...")
 				cleanedUsers, err := userUsecase.CleanupInactiveUsers(ctx) // Use main ctx
 				if err != nil {
-					log.Printf("Error during inactive user cleanup: %v", err)
+					slog.Error("error during inactive user cleanup", "error", err)
 				}
 				if len(cleanedUsers) > 0 {
-					log.Printf("Cleaned up %d inactive users", len(cleanedUsers))
+					slog.Info("cleaned up inactive users", "count", len(cleanedUsers))
 				}
 			case <-ctx.Done(): // Listen for main context cancellation
-				log.Println("Inactive user cleanup routine stopped.")
+				slog.Info("inactive user cleanup routine stopped.")
 				return
 			}
 		}
 	}()
 
 	// Initialize HTTP handler and router
-	httpHandler := transportHTTP.NewHandler(userUsecase, eventUsecase, eventRepo)
-	router := httpHandler.InitRoutes()
+	handler := transportHTTP.NewHandler(userUsecase, eventUsecase, eventRepo, redisClient)
+	router := handler.InitRoutes()
 
 	// Setup and start server
 	server := &http.Server{
@@ -90,9 +91,10 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Starting server on %s", cfg.Server.Port)
+		slog.Info("starting server", "port", cfg.Server.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Could not listen on %s: %v\n", cfg.Server.Port, err)
+			slog.Error("server failed to start", "error", err)
+			os.Exit(1)
 		}
 	}()
 
@@ -100,15 +102,16 @@ func main() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
-	log.Println("Shutting down server...")
+	slog.Info("shutting down server...")
 
 	shutdownCtx, shutdownCancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer shutdownCancel()
 
 	if err := server.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("Server forced to shutdown: %v", err)
+		slog.Error("server forced to shutdown", "error", err)
+		os.Exit(1)
 	}
 
-	log.Println("Server exiting")
+	slog.Info("server exiting")
 }
 
