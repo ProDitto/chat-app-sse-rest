@@ -3,23 +3,23 @@ package usecase
 import (
 	"context"
 	"errors"
+	"fmt"
 	"sse-chat/internal/domain"
-	"sse-chat/pkg/utils"
 	"time"
 )
 
 var (
-	ErrMessageTooLong = errors.New("message text is too long")
+	ErrMessageTooLong = errors.New("message text exceeds maximum length")
 )
 
 const maxMessageLength = 500
 
 type eventUsecase struct {
-	eventRepo usecase.EventRepository
-	userRepo  usecase.UserRepository
+	eventRepo EventRepository
+	userRepo  UserRepository
 }
 
-func NewEventUsecase(eventRepo usecase.EventRepository, userRepo usecase.UserRepository) usecase.EventUsecase {
+func NewEventUsecase(eventRepo EventRepository, userRepo UserRepository) EventUsecase {
 	return &eventUsecase{
 		eventRepo: eventRepo,
 		userRepo:  userRepo,
@@ -35,7 +35,6 @@ func (uc *eventUsecase) SendMessage(ctx context.Context, fromUserID, toUserID, t
 	}
 
 	event := &domain.Event{
-		EventID:    utils.GenerateID(), // This is a placeholder; Redis will generate the final stream ID
 		Timestamp:  time.Now().UTC(),
 		Type:       domain.Message,
 		FromUserID: fromUserID,
@@ -49,30 +48,31 @@ func (uc *eventUsecase) SendMessage(ctx context.Context, fromUserID, toUserID, t
 
 	// Publish to recipient's stream
 	if err := uc.eventRepo.PublishEventToUser(ctx, toUserID, event); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to publish message to recipient: %w", err)
 	}
 
-	// Publish to sender's stream for sync across their own clients
+	// Publish to sender's stream (for history)
 	if err := uc.eventRepo.PublishEventToUser(ctx, fromUserID, event); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("failed to publish message to sender: %w", err)
 	}
 
 	// Update sender's activity
-	if err := uc.userRepo.Update(ctx, &domain.User{UserID: fromUserID, LastActive: time.Now().UTC()}); err != nil {
-		// Log error but don't fail the message sending
+	user, err := uc.userRepo.FindByID(ctx, fromUserID)
+	if err == nil && user != nil {
+		user.LastActive = time.Now().UTC()
+		uc.userRepo.Update(ctx, user)
 	}
 
 	return event, nil
 }
 
 func (uc *eventUsecase) BroadcastTyping(ctx context.Context, fromUserID, toUserID string, isTyping bool) error {
-	eventType := domain.TypingStart
-	if !isTyping {
-		eventType = domain.TypingStop
+	eventType := domain.TypingStop
+	if isTyping {
+		eventType = domain.TypingStart
 	}
 
 	event := &domain.Event{
-		EventID:    utils.GenerateID(),
 		Timestamp:  time.Now().UTC(),
 		Type:       eventType,
 		FromUserID: fromUserID,
@@ -83,16 +83,31 @@ func (uc *eventUsecase) BroadcastTyping(ctx context.Context, fromUserID, toUserI
 		},
 	}
 
-	// Only publish to the recipient
 	if err := uc.eventRepo.PublishEventToUser(ctx, toUserID, event); err != nil {
-		return err
+		return fmt.Errorf("failed to publish typing event: %w", err)
 	}
 
 	// Update sender's activity
-	if err := uc.userRepo.Update(ctx, &domain.User{UserID: fromUserID, LastActive: time.Now().UTC()}); err != nil {
-		// Log error but don't fail the typing event
+	user, err := uc.userRepo.FindByID(ctx, fromUserID)
+	if err == nil && user != nil {
+		user.LastActive = time.Now().UTC()
+		uc.userRepo.Update(ctx, user)
 	}
 
 	return nil
+}
+
+func (uc *eventUsecase) GetSnapshot(ctx context.Context, userID, lastEventID string) ([]*domain.Event, []*domain.User, error) {
+	events, err := uc.eventRepo.GetEventsForUserAfter(ctx, userID, lastEventID)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get events for user: %w", err)
+	}
+
+	activeUsers, err := uc.userRepo.GetActiveUsers(ctx)
+	if err != nil {
+		return nil, nil, fmt.Errorf("failed to get active users: %w", err)
+	}
+
+	return events, activeUsers, nil
 }
 

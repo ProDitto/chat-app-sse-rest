@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -13,7 +14,7 @@ import (
 
 	"sse-chat/internal/config"
 	"sse-chat/internal/repository"
-	"sse-chat/internal/transport/http/handler" // Use original package name
+	transportHTTP "sse-chat/internal/transport/http"
 	"sse-chat/internal/usecase"
 )
 
@@ -41,6 +42,7 @@ func main() {
 		Password: cfg.Redis.Password,
 		DB:       cfg.Redis.DB,
 	})
+	defer redisClient.Close()
 
 	if _, err := redisClient.Ping(ctx).Result(); err != nil {
 		log.Fatalf("Could not connect to Redis: %v", err)
@@ -62,6 +64,7 @@ func main() {
 		for {
 			select {
 			case <-ticker.C:
+				log.Println("Running inactive user cleanup...")
 				cleanedUsers, err := userUsecase.CleanupInactiveUsers(ctx) // Use main ctx
 				if err != nil {
 					log.Printf("Error during inactive user cleanup: %v", err)
@@ -77,7 +80,7 @@ func main() {
 	}()
 
 	// Initialize HTTP handler and router
-	httpHandler := handler.NewHandler(userUsecase, eventUsecase) // Pass both usecases
+	httpHandler := transportHTTP.NewHandler(userUsecase, eventUsecase, eventRepo)
 	router := httpHandler.InitRoutes()
 
 	// Setup and start server
@@ -87,9 +90,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("Starting server on %s", server.Addr)
+		log.Printf("Starting server on %s", cfg.Server.Port)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("Could not listen on %s: %v\n", server.Addr, err)
+			log.Fatalf("Could not listen on %s: %v\n", cfg.Server.Port, err)
 		}
 	}()
 
@@ -108,3 +111,4 @@ func main() {
 
 	log.Println("Server exiting")
 }
+

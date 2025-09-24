@@ -2,7 +2,6 @@ package repository
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"strconv"
 	"time"
@@ -21,7 +20,7 @@ func userKey(userID string) string {
 }
 
 func usernameCooldownKey(username string) string {
-	return fmt.Sprintf("username_cooldown:%s", username)
+	return fmt.Sprintf("cooldown:%s", username)
 }
 
 type redisUserRepository struct {
@@ -33,62 +32,79 @@ func NewRedisUserRepository(client *redis.Client) *redisUserRepository {
 }
 
 func (r *redisUserRepository) Create(ctx context.Context, user *domain.User) error {
-	userData, err := json.Marshal(user)
-	if err != nil {
-		return err
-	}
-
 	pipe := r.client.TxPipeline()
-	pipe.Set(ctx, userKey(user.UserID), userData, 0)
-	pipe.ZAdd(ctx, activeUsersKey, &redis.Z{Score: float64(user.LastActive.Unix()), Member: user.UserID})
+
+	pipe.HSet(ctx, userKey(user.UserID), map[string]interface{}{
+		"username":             user.Username,
+		"lastActive":           user.LastActive.Unix(),
+		"isOnline":             user.IsOnline,
+		"lastDeliveredEventId": user.LastDeliveredEventID,
+	})
+	pipe.ZAdd(ctx, activeUsersKey, &redis.Z{
+		Score:  float64(user.LastActive.Unix()),
+		Member: user.UserID,
+	})
 	pipe.SAdd(ctx, usernamesKey, user.Username)
 
-	_, err = pipe.Exec(ctx)
+	_, err := pipe.Exec(ctx)
 	return err
 }
 
 func (r *redisUserRepository) FindByID(ctx context.Context, userID string) (*domain.User, error) {
-	data, err := r.client.Get(ctx, userKey(userID)).Result()
-	if err == redis.Nil {
-		return nil, nil
-	}
+	data, err := r.client.HGetAll(ctx, userKey(userID)).Result()
 	if err != nil {
 		return nil, err
 	}
-
-	var user domain.User
-	if err := json.Unmarshal([]byte(data), &user); err != nil {
-		return nil, err
+	if len(data) == 0 {
+		return nil, redis.Nil
 	}
-	return &user, nil
+
+	user := &domain.User{UserID: userID}
+	user.Username = data["username"]
+	user.LastDeliveredEventID = data["lastDeliveredEventId"]
+
+	if lastActive, err := strconv.ParseInt(data["lastActive"], 10, 64); err == nil {
+		user.LastActive = time.Unix(lastActive, 0)
+	}
+	if isOnline, err := strconv.ParseBool(data["isOnline"]); err == nil {
+		user.IsOnline = isOnline
+	}
+
+	return user, nil
 }
 
 func (r *redisUserRepository) Update(ctx context.Context, user *domain.User) error {
-	userData, err := json.Marshal(user)
-	if err != nil {
-		return err
-	}
-
 	pipe := r.client.TxPipeline()
-	pipe.Set(ctx, userKey(user.UserID), userData, 0)
-	pipe.ZAdd(ctx, activeUsersKey, &redis.Z{Score: float64(user.LastActive.Unix()), Member: user.UserID})
-	// If username changed, we need to update the usernames set
+
+	pipe.HSet(ctx, userKey(user.UserID), map[string]interface{}{
+		"username":             user.Username,
+		"lastActive":           user.LastActive.Unix(),
+		"isOnline":             user.IsOnline,
+		"lastDeliveredEventId": user.LastDeliveredEventID,
+	})
+	pipe.ZAdd(ctx, activeUsersKey, &redis.Z{
+		Score:  float64(user.LastActive.Unix()),
+		Member: user.UserID,
+	})
 	pipe.SAdd(ctx, usernamesKey, user.Username)
 
-	_, err = pipe.Exec(ctx)
+	_, err := pipe.Exec(ctx)
 	return err
 }
 
 func (r *redisUserRepository) Delete(ctx context.Context, userID string) error {
 	user, err := r.FindByID(ctx, userID)
-	if err != nil || user == nil {
+	if err != nil {
 		return err
 	}
 
 	pipe := r.client.TxPipeline()
 	pipe.Del(ctx, userKey(userID))
 	pipe.ZRem(ctx, activeUsersKey, userID)
-	pipe.SRem(ctx, usernamesKey, user.Username)
+	if user != nil { // Safeguard in case FindByID returns nil user but no error (e.g., redis.Nil)
+		pipe.SRem(ctx, usernamesKey, user.Username)
+	}
+
 	_, err = pipe.Exec(ctx)
 	return err
 }
@@ -99,42 +115,25 @@ func (r *redisUserRepository) GetActiveUsers(ctx context.Context) ([]*domain.Use
 		return nil, err
 	}
 
-	if len(userIDs) == 0 {
-		return []*domain.User{}, nil
-	}
-
-	pipe := r.client.Pipeline()
-	cmds := make([]*redis.StringCmd, len(userIDs))
-	for i, id := range userIDs {
-		cmds[i] = pipe.Get(ctx, userKey(id))
-	}
-	_, err = pipe.Exec(ctx)
-	if err != nil && err != redis.Nil {
-		return nil, err
-	}
-
 	users := make([]*domain.User, 0, len(userIDs))
-	for _, cmd := range cmds {
-		data, err := cmd.Result()
+	for _, id := range userIDs {
+		user, err := r.FindByID(ctx, id)
 		if err == redis.Nil {
-			continue // User might have been deleted between ZRANGE and GET
+			continue // User might have been deleted concurrently
 		}
 		if err != nil {
 			return nil, err
 		}
-		var user domain.User
-		if err := json.Unmarshal([]byte(data), &user); err == nil {
-			users = append(users, &user)
-		}
+		users = append(users, user)
 	}
 	return users, nil
 }
 
 func (r *redisUserRepository) FindInactiveUsers(ctx context.Context, timeout time.Duration) ([]string, error) {
-	maxScore := strconv.FormatInt(time.Now().UTC().Add(-timeout).Unix(), 10)
+	maxScore := time.Now().Add(-timeout).Unix()
 	return r.client.ZRangeByScore(ctx, activeUsersKey, &redis.ZRangeBy{
 		Min: "-inf",
-		Max: maxScore,
+		Max: strconv.FormatInt(maxScore, 10),
 	}).Result()
 }
 
@@ -145,16 +144,23 @@ func (r *redisUserRepository) IsUsernameTaken(ctx context.Context, username stri
 func (r *redisUserRepository) ReleaseUsername(ctx context.Context, username string, cooldown time.Duration) error {
 	pipe := r.client.TxPipeline()
 	pipe.SRem(ctx, usernamesKey, username)
-	pipe.SetEX(ctx, usernameCooldownKey(username), "1", cooldown)
+	pipe.Set(ctx, usernameCooldownKey(username), "1", cooldown)
 	_, err := pipe.Exec(ctx)
 	return err
 }
 
 func (r *redisUserRepository) IsUsernameOnCooldown(ctx context.Context, username string) (bool, error) {
-	val, err := r.client.Exists(ctx, usernameCooldownKey(username)).Result()
+	err := r.client.Get(ctx, usernameCooldownKey(username)).Err()
+	if err == redis.Nil {
+		return false, nil
+	}
 	if err != nil {
 		return false, err
 	}
-	return val > 0, nil
+	return true, nil
+}
+
+func (r *redisUserRepository) UpdateLastDeliveredEventID(ctx context.Context, userID, eventID string) error {
+	return r.client.HSet(ctx, userKey(userID), "lastDeliveredEventId", eventID).Err()
 }
 

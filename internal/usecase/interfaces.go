@@ -19,6 +19,7 @@ type UserRepository interface {
 	IsUsernameTaken(ctx context.Context, username string) (bool, error)
 	ReleaseUsername(ctx context.Context, username string, cooldown time.Duration) error
 	IsUsernameOnCooldown(ctx context.Context, username string) (bool, error)
+	UpdateLastDeliveredEventID(ctx context.Context, userID, eventID string) error
 }
 
 // UserUsecase defines the contract for business logic operations related to users.
@@ -28,6 +29,7 @@ type UserUsecase interface {
 	UpdateActivity(ctx context.Context, userID string) error
 	Disconnect(ctx context.Context, userID string) (*domain.User, error)
 	CleanupInactiveUsers(ctx context.Context) ([]*domain.User, error)
+	UpdateLastDeliveredEventID(ctx context.Context, userID, eventID string) error
 }
 
 // EventRepository defines the contract for event persistence and broadcasting.
@@ -38,6 +40,8 @@ type EventRepository interface {
 	PublishEventToAll(ctx context.Context, event *domain.Event) error
 	// GetEventsForUserAfter retrieves events for a user from their stream after a given event ID.
 	GetEventsForUserAfter(ctx context.Context, userID, lastEventID string) ([]*domain.Event, error)
+	// GetEventsForUserBlocking retrieves events for a user from their stream, blocking until new events are available or timeout.
+	GetEventsForUserBlocking(ctx context.Context, userID, lastEventID string, timeout time.Duration) ([]*domain.Event, error)
 	// SubscribeToBroadcasts subscribes to the global event broadcast channel.
 	SubscribeToBroadcasts(ctx context.Context) *redis.PubSub
 }
@@ -46,5 +50,6 @@ type EventRepository interface {
 type EventUsecase interface {
 	SendMessage(ctx context.Context, fromUserID, toUserID, text string) (*domain.Event, error)
 	BroadcastTyping(ctx context.Context, fromUserID, toUserID string, isTyping bool) error
+	GetSnapshot(ctx context.Context, userID, lastEventID string) ([]*domain.Event, []*domain.User, error)
 }
 
