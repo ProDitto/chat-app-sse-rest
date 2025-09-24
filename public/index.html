@@ -10,33 +10,40 @@
 </head>
 <body class="bg-gray-900 text-gray-200 font-sans">
 
+    <!-- Main App Container -->
     <div id="app" class="flex h-screen hidden">
-        <!-- User List Sidebar -->
-        <aside class="w-64 bg-gray-800 flex flex-col">
+        <!-- Sidebar -->
+        <aside class="w-64 bg-gray-800 flex flex-col border-r border-gray-700">
             <header class="p-4 border-b border-gray-700">
-                <h2 class="text-lg font-bold">Active Users</h2>
+                <h1 class="text-xl font-bold">Active Users</h1>
             </header>
-            <div id="user-list" class="flex-1 p-2 overflow-y-auto user-list-scrollbar">
-                <!-- User items will be injected here -->
+            <div id="user-list" class="flex-1 overflow-y-auto user-list-scrollbar">
+                <!-- User list will be rendered here -->
             </div>
-            <div id="current-user-panel" class="p-2 border-t border-gray-700 flex items-center gap-3">
-                <!-- Current user info will be injected here -->
+            <div id="current-user-panel" class="p-3 border-t border-gray-700 bg-gray-900">
+                <!-- Current user info will be rendered here -->
             </div>
         </aside>
 
         <!-- Main Chat Area -->
         <main class="flex-1 flex flex-col">
-            <header id="chat-header" class="p-4 border-b border-gray-700 flex items-center gap-4 h-[73px]">
-                Select a user to start chatting
+            <header id="chat-header" class="p-4 border-b border-gray-700 flex justify-between items-center">
+                <h2 id="chat-header-username" class="text-xl font-bold">Select a user to start chatting</h2>
+                <div class="relative">
+                    <input type="search" id="message-search-input" placeholder="Search messages..." class="bg-gray-700 rounded-full px-4 py-1 text-sm focus:outline-none w-48" style="display: none;">
+                </div>
             </header>
-            <div id="message-list" class="flex-1 p-4 overflow-y-auto">
-                <!-- Messages will be appended here -->
+            <div id="message-list" class="flex-1 p-4 overflow-y-auto flex flex-col-reverse">
+                <!-- Messages will be rendered here -->
+                <div id="load-more-container" class="text-center mt-4">
+                    <button id="load-more-messages" class="hidden bg-gray-700 hover:bg-gray-600 text-sm px-3 py-1 rounded-full">Load More</button>
+                </div>
             </div>
             <footer class="p-4 border-t border-gray-700">
-                <div id="typing-indicator" class="text-sm text-gray-400 h-5 mb-1 hidden"></div>
-                <form id="message-form" class="flex gap-4">
+                <div id="typing-indicator" class="h-5 text-sm text-gray-400 italic"></div>
+                <form id="message-form" class="flex items-center">
                     <input type="text" id="message-input" class="flex-1 bg-gray-700 rounded-full px-4 py-2 focus:outline-none" placeholder="Type a message..." autocomplete="off" disabled>
-                    <button type="submit" id="send-button" class="bg-blue-600 text-white rounded-full px-4 py-2 hover:bg-blue-700 disabled:bg-gray-600" disabled>Send</button>
+                    <button type="submit" id="send-button" class="ml-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full disabled:opacity-50" disabled>Send</button>
                 </form>
             </footer>
         </main>
@@ -45,24 +52,15 @@
     <!-- Username Modal -->
     <div id="username-modal" class="fixed inset-0 bg-black bg-opacity-75 flex items-center justify-center modal-overlay">
         <div class="bg-gray-800 p-8 rounded-lg shadow-xl w-full max-w-sm">
-            <h2 class="text-2xl font-bold mb-4 text-center">Join Chat</h2>
+            <h2 class="text-2xl font-bold mb-4">Welcome to SSE-Chat</h2>
+            <p class="text-gray-400 mb-6">Choose a username to join the chat.</p>
             <form id="join-form">
-                <input type="text" id="username-input" class="w-full bg-gray-700 rounded px-4 py-2 mb-4 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="Enter your username" required minlength="3" maxlength="20">
-                <p id="modal-error" class="text-red-400 text-sm h-5 mb-2"></p>
-                <button type="submit" id="join-button" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded hover:bg-blue-700 disabled:bg-gray-600">
-                    Join
-                </button>
+                <input type="text" id="username-input" class="w-full bg-gray-700 rounded px-4 py-2 mb-4 focus:outline-none" placeholder="Enter your username" required minlength="3" maxlength="20">
+                <p id="modal-error" class="text-red-400 h-5 mb-2 text-sm"></p>
+                <button type="submit" id="join-button" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded">Join Chat</button>
             </form>
         </div>
     </div>
 
     <script src="/js/lib/dexie.min.js"></script>
-    <script type="module" src="/js/types.js"></script>
-    <script type="module" src="/js/components/avatar.js"></script>
-    <script type="module" src="/js/api.js"></script>
-    <script type="module" src="/js/store.js"></script>
-    <script type="module" src="/js/sse.js"></script>
-    <script type="module" src="/js/ui.js"></script>
-    <script type="module" src="/js/main.js"></script>
-</body>
-</html>
+    <audio id="notification-sound" src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4LjMyLjEwNAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA//tAwAAAAAAAAAAAAAAAAAAAAAA
