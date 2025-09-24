@@ -1,0 +1,12 @@
+server:
+  port: ":8080"
+
+redis:
+  addr: "localhost:6379"
+  password: ""
+  db: 0
+
+app:
+  user_inactive_timeout_minutes: 5
+  username_cooldown_minutes: 1
+
