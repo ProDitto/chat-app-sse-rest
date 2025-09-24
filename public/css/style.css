@@ -1,0 +1,27 @@
+/* For smooth transitions */
+.hidden {
+    display: none;
+}
+
+.modal-overlay {
+    transition: opacity 0.3s ease;
+}
+
+/* Custom scrollbar for user list */
+.user-list-scrollbar::-webkit-scrollbar {
+    width: 8px;
+}
+
+.user-list-scrollbar::-webkit-scrollbar-track {
+    background: #2d3748; /* gray-800 */
+}
+
+.user-list-scrollbar::-webkit-scrollbar-thumb {
+    background: #4a5568; /* gray-600 */
+    border-radius: 4px;
+}
+
+.user-list-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #718096; /* gray-500 */
+}
+
