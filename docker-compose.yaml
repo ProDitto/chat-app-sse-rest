@@ -1,11 +1,13 @@
 version: '3.8'
+
 services:
   redis:
-    image: "redis:alpine"
+    image: redis:alpine
     ports:
       - "6379:6379"
     volumes:
       - redis_data:/data
+    restart: unless-stopped
 
   app:
     build: .
@@ -14,8 +16,10 @@ services:
     depends_on:
       - redis
     environment:
+      # Override config file settings for containerized environment
       - REDIS_ADDR=redis:6379
       - SERVER_PORT=:8080
+    restart: unless-stopped
 
 volumes:
   redis_data:
