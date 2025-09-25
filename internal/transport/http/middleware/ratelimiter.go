@@ -43,4 +43,3 @@ func RateLimiter(client *redis.Client, keyPrefix string, limit int, window time.
 		})
 	}
 }
-```
